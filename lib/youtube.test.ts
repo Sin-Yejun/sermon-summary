@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extractVideoId } from './youtube';
+import { extractVideoId, parseVtt } from './youtube';
 
 describe('extractVideoId', () => {
   it.each([
@@ -25,5 +25,43 @@ describe('extractVideoId', () => {
     ['', null],
   ])('returns null for non-youtube %s', (url, expected) => {
     expect(extractVideoId(url)).toBe(expected);
+  });
+});
+
+describe('parseVtt', () => {
+  it('strips header, timestamps and html tags', () => {
+    const vtt = `WEBVTT
+Kind: captions
+Language: ko
+
+00:00:01.000 --> 00:00:03.000
+안녕하세요 <c.colorE5E5E5>여러분</c>
+
+00:00:03.000 --> 00:00:05.000
+오늘 본문은 베드로전서 4장입니다`;
+
+    expect(parseVtt(vtt)).toBe(
+      '안녕하세요 여러분 오늘 본문은 베드로전서 4장입니다',
+    );
+  });
+
+  it('deduplicates immediate repeated lines (autosub artifact)', () => {
+    const vtt = `WEBVTT
+
+00:00:01.000 --> 00:00:03.000
+청지기 정신
+
+00:00:03.000 --> 00:00:05.000
+청지기 정신
+
+00:00:05.000 --> 00:00:07.000
+이라는 것은`;
+
+    expect(parseVtt(vtt)).toBe('청지기 정신 이라는 것은');
+  });
+
+  it('returns empty string for empty input', () => {
+    expect(parseVtt('')).toBe('');
+    expect(parseVtt('WEBVTT\n')).toBe('');
   });
 });

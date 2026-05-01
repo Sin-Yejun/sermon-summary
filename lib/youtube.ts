@@ -15,3 +15,23 @@ export function extractVideoId(url: string): string | null {
   }
   return null;
 }
+
+const TIMESTAMP_RE = /^\d{2}:\d{2}:\d{2}\.\d{3} -->/;
+const HEADER_PREFIXES = ['WEBVTT', 'Kind:', 'Language:', 'NOTE'];
+
+export function parseVtt(vtt: string): string {
+  const out: string[] = [];
+  let last = '';
+  for (const raw of vtt.split('\n')) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (HEADER_PREFIXES.some((p) => line.startsWith(p))) continue;
+    if (TIMESTAMP_RE.test(line)) continue;
+    const cleaned = line.replace(/<[^>]+>/g, '').trim();
+    if (!cleaned) continue;
+    if (cleaned === last) continue;
+    out.push(cleaned);
+    last = cleaned;
+  }
+  return out.join(' ');
+}
