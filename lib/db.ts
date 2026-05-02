@@ -17,11 +17,28 @@ const SCHEMA = `
     bibleReference TEXT,
     durationSeconds INTEGER,
     transcript TEXT,
+    transcriptSegments TEXT,
     summaryMarkdown TEXT,
+    summaryJson TEXT,
     createdAt TEXT NOT NULL,
     updatedAt TEXT NOT NULL
   );
 `;
+
+const ADDED_COLUMNS: Array<{ name: string; ddl: string }> = [
+  { name: 'transcriptSegments', ddl: 'ALTER TABLE sermons ADD COLUMN transcriptSegments TEXT' },
+  { name: 'summaryJson', ddl: 'ALTER TABLE sermons ADD COLUMN summaryJson TEXT' },
+];
+
+function migrate(db: Database.Database): void {
+  const cols = db.prepare(`PRAGMA table_info(sermons)`).all() as Array<{
+    name: string;
+  }>;
+  const have = new Set(cols.map((c) => c.name));
+  for (const { name, ddl } of ADDED_COLUMNS) {
+    if (!have.has(name)) db.exec(ddl);
+  }
+}
 
 export function createDb(opts: { reset?: boolean } = {}): Database.Database {
   if (_db && !opts.reset) return _db;
@@ -33,6 +50,7 @@ export function createDb(opts: { reset?: boolean } = {}): Database.Database {
   _db = new Database(path);
   _db.pragma('journal_mode = WAL');
   _db.exec(SCHEMA);
+  migrate(_db);
   return _db;
 }
 
@@ -53,7 +71,9 @@ const COLUMNS = [
   'bibleReference',
   'durationSeconds',
   'transcript',
+  'transcriptSegments',
   'summaryMarkdown',
+  'summaryJson',
   'createdAt',
   'updatedAt',
 ] as const;
@@ -63,6 +83,18 @@ export function getSermon(videoId: string): Sermon | null {
     .prepare(`SELECT ${COLUMNS.join(', ')} FROM sermons WHERE videoId = ?`)
     .get(videoId) as Sermon | undefined;
   return row ?? null;
+}
+
+export function listSermons(): Sermon[] {
+  return getDb()
+    .prepare(
+      `SELECT ${COLUMNS.join(', ')} FROM sermons ORDER BY createdAt DESC`,
+    )
+    .all() as Sermon[];
+}
+
+export function deleteSermon(videoId: string): void {
+  getDb().prepare(`DELETE FROM sermons WHERE videoId = ?`).run(videoId);
 }
 
 export function createSermon(videoId: string, url: string): void {
