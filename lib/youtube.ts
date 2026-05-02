@@ -116,6 +116,48 @@ export async function fetchVideoMetadata(url: string): Promise<YtDlpMetadata> {
   return JSON.parse(json) as YtDlpMetadata;
 }
 
+export interface PlaylistVideo {
+  id: string;
+  title: string;
+  url: string;
+}
+
+export async function fetchPlaylistVideos(
+  playlistUrl: string,
+  opts: { limit?: number } = {},
+): Promise<PlaylistVideo[]> {
+  const limit = opts.limit ?? 20;
+  const out = await runYtDlp([
+    '--flat-playlist',
+    '--dump-json',
+    '--ignore-errors',
+    '--playlist-end',
+    String(limit),
+    playlistUrl,
+  ]);
+  const videos: PlaylistVideo[] = [];
+  for (const line of out.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    try {
+      const j = JSON.parse(trimmed) as {
+        id?: string;
+        title?: string;
+        url?: string;
+      };
+      if (!j.id) continue;
+      videos.push({
+        id: j.id,
+        title: j.title ?? '',
+        url: j.url ?? `https://www.youtube.com/watch?v=${j.id}`,
+      });
+    } catch {
+      continue;
+    }
+  }
+  return videos;
+}
+
 export async function fetchSubtitleSegments(
   url: string,
 ): Promise<TranscriptSegment[]> {
