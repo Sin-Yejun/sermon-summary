@@ -48,3 +48,4 @@ sermon-summary.db-*
 
 # tooling state
 .omc/
+.claude
