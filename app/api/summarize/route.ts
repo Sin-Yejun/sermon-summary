@@ -1,9 +1,21 @@
 import { NextResponse } from 'next/server';
 import { extractVideoId } from '@/lib/youtube';
-import { createSermon, getSermon } from '@/lib/db';
+import { createSermon, getSermon, updateSermon } from '@/lib/db';
 import { processSermon } from '@/lib/worker';
+import type { Sermon } from '@/lib/types';
 
 export const runtime = 'nodejs';
+
+function isStale(s: Sermon): boolean {
+  if (s.status === 'failed') return true;
+  if (s.status !== 'done') return false;
+  if (!s.summaryJson || !s.transcriptSegments) return true;
+  if (/&(?:gt|lt|amp);/.test(s.transcriptSegments)) return true;
+  if (!s.summaryJson.includes('coveredIdxRange') && !s.summaryJson.includes('startTs')) {
+    return true;
+  }
+  return false;
+}
 
 export async function POST(req: Request) {
   let body: unknown;
@@ -27,6 +39,11 @@ export async function POST(req: Request) {
   const existing = getSermon(videoId);
   if (!existing) {
     createSermon(videoId, url);
+    void processSermon(videoId, url).catch((e) => {
+      console.error('[worker]', videoId, e);
+    });
+  } else if (isStale(existing)) {
+    updateSermon(videoId, { status: 'pending', errorMessage: null });
     void processSermon(videoId, url).catch((e) => {
       console.error('[worker]', videoId, e);
     });

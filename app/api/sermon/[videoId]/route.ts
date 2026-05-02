@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSermon } from '@/lib/db';
+import { deleteSermon, getSermon } from '@/lib/db';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -14,4 +14,13 @@ export async function GET(
     return NextResponse.json({ error: 'not found' }, { status: 404 });
   }
   return NextResponse.json(sermon);
+}
+
+export async function DELETE(
+  _req: Request,
+  context: { params: Promise<{ videoId: string }> },
+) {
+  const { videoId } = await context.params;
+  deleteSermon(videoId);
+  return NextResponse.json({ ok: true });
 }
