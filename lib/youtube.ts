@@ -21,24 +21,70 @@ export function extractVideoId(url: string): string | null {
   return null;
 }
 
-const TIMESTAMP_RE = /^\d{2}:\d{2}:\d{2}\.\d{3} -->/;
+const TIMESTAMP_RE = /^(\d{2}):(\d{2}):(\d{2})\.(\d{3}) -->/;
 const HEADER_PREFIXES = ['WEBVTT', 'Kind:', 'Language:', 'NOTE'];
 
-export function parseVtt(vtt: string): string {
-  const out: string[] = [];
-  let last = '';
+import type { TranscriptSegment } from './types';
+
+function tsToSeconds(h: string, m: string, s: string, ms: string): number {
+  return (
+    Number(h) * 3600 + Number(m) * 60 + Number(s) + Number(ms) / 1000
+  );
+}
+
+const ENTITY_MAP: Record<string, string> = {
+  '&amp;': '&',
+  '&lt;': '<',
+  '&gt;': '>',
+  '&quot;': '"',
+  '&#39;': "'",
+  '&nbsp;': ' ',
+};
+
+function decodeEntities(s: string): string {
+  return s.replace(
+    /&(?:amp|lt|gt|quot|#39|nbsp);/g,
+    (m) => ENTITY_MAP[m] ?? m,
+  );
+}
+
+function cleanCaption(line: string): string {
+  let s = line.replace(/<[^>]+>/g, '');
+  s = decodeEntities(s);
+  s = s.replace(/^>+\s*/, '');
+  return s.trim();
+}
+
+export function parseVttSegments(vtt: string): TranscriptSegment[] {
+  const segments: TranscriptSegment[] = [];
+  let pendingTs: number | null = null;
+  let lastText = '';
   for (const raw of vtt.split('\n')) {
     const line = raw.trim();
     if (!line) continue;
     if (HEADER_PREFIXES.some((p) => line.startsWith(p))) continue;
-    if (TIMESTAMP_RE.test(line)) continue;
-    const cleaned = line.replace(/<[^>]+>/g, '').trim();
+    const m = line.match(TIMESTAMP_RE);
+    if (m) {
+      pendingTs = tsToSeconds(m[1], m[2], m[3], m[4]);
+      continue;
+    }
+    const cleaned = cleanCaption(line);
     if (!cleaned) continue;
-    if (cleaned === last) continue;
-    out.push(cleaned);
-    last = cleaned;
+    if (cleaned === lastText) continue;
+    segments.push({
+      idx: segments.length,
+      ts: pendingTs ?? 0,
+      text: cleaned,
+    });
+    lastText = cleaned;
   }
-  return out.join(' ');
+  return segments;
+}
+
+export function parseVtt(vtt: string): string {
+  return parseVttSegments(vtt)
+    .map((s) => s.text)
+    .join(' ');
 }
 
 export interface YtDlpMetadata {
@@ -70,7 +116,9 @@ export async function fetchVideoMetadata(url: string): Promise<YtDlpMetadata> {
   return JSON.parse(json) as YtDlpMetadata;
 }
 
-export async function fetchSubtitles(url: string): Promise<string> {
+export async function fetchSubtitleSegments(
+  url: string,
+): Promise<TranscriptSegment[]> {
   const dir = await mkdtemp(path.join(tmpdir(), 'sermon-sub-'));
   try {
     await runYtDlp(
@@ -93,8 +141,13 @@ export async function fetchSubtitles(url: string): Promise<string> {
       throw new Error('이 영상에는 한국어 자막이 없어 요약할 수 없습니다.');
     }
     const vtt = await readFile(path.join(dir, vttFile), 'utf8');
-    return parseVtt(vtt);
+    return parseVttSegments(vtt);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+}
+
+export async function fetchSubtitles(url: string): Promise<string> {
+  const segments = await fetchSubtitleSegments(url);
+  return segments.map((s) => s.text).join(' ');
 }

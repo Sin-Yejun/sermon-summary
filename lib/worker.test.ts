@@ -2,23 +2,50 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('./youtube', () => ({
   fetchVideoMetadata: vi.fn(),
-  fetchSubtitles: vi.fn(),
+  fetchSubtitleSegments: vi.fn(),
 }));
 vi.mock('./summarize', () => ({
   summarizeSermon: vi.fn(),
 }));
 
-import { fetchVideoMetadata, fetchSubtitles } from './youtube';
+import { fetchVideoMetadata, fetchSubtitleSegments } from './youtube';
 import { summarizeSermon } from './summarize';
 import { processSermon } from './worker';
 import { createDb, createSermon, getSermon } from './db';
+import type { SummaryDoc, TranscriptSegment } from './types';
+
+function makeSegments(n: number): TranscriptSegment[] {
+  return Array.from({ length: n }, (_, i) => ({
+    idx: i,
+    ts: i * 5,
+    text: '자막 본문이 길게 이어집니다',
+  }));
+}
+
+const SUMMARY: SummaryDoc = {
+  tldr: '핵심 요약',
+  sections: [
+    {
+      id: '1',
+      title: '도입',
+      subsections: [
+        {
+          id: '1.1',
+          title: '인생의 유한함',
+          startTs: 5,
+          bullets: [{ text: '인생은 짧다.', citations: [0] }],
+        },
+      ],
+    },
+  ],
+};
 
 describe('processSermon', () => {
   beforeEach(() => {
     process.env.SERMON_DB_PATH = ':memory:';
     createDb({ reset: true });
     vi.mocked(fetchVideoMetadata).mockReset();
-    vi.mocked(fetchSubtitles).mockReset();
+    vi.mocked(fetchSubtitleSegments).mockReset();
     vi.mocked(summarizeSermon).mockReset();
   });
 
@@ -34,8 +61,8 @@ describe('processSermon', () => {
       channel: '분당우리교회 BWMC',
       upload_date: '20260426',
     });
-    vi.mocked(fetchSubtitles).mockResolvedValue('자막 본문 '.repeat(200));
-    vi.mocked(summarizeSermon).mockResolvedValue('## 도입\n요약 내용입니다.');
+    vi.mocked(fetchSubtitleSegments).mockResolvedValue(makeSegments(60));
+    vi.mocked(summarizeSermon).mockResolvedValue(structuredClone(SUMMARY));
 
     createSermon('abc12345678', 'https://youtu.be/abc12345678');
     await processSermon('abc12345678', 'https://youtu.be/abc12345678');
@@ -47,8 +74,11 @@ describe('processSermon', () => {
     expect(s!.preacher).toBe('이찬수 목사');
     expect(s!.sermonDate).toBe('2026-04-26');
     expect(s!.channelName).toBe('분당우리교회');
-    expect(s!.summaryMarkdown).toContain('## 도입');
     expect(s!.transcript).toMatch(/^자막 본문/);
+    expect(s!.transcriptSegments).toMatch(/"idx":0/);
+    expect(s!.summaryJson).toBeTruthy();
+    const doc = JSON.parse(s!.summaryJson!) as SummaryDoc;
+    expect(doc.sections[0].subsections[0].startTs).toBe(5);
     expect(s!.errorMessage).toBeNull();
   });
 
@@ -61,7 +91,7 @@ describe('processSermon', () => {
       channel: 'c',
       upload_date: '20260426',
     });
-    vi.mocked(fetchSubtitles).mockRejectedValue(new Error('자막 없음'));
+    vi.mocked(fetchSubtitleSegments).mockRejectedValue(new Error('자막 없음'));
 
     createSermon('abc12345678', 'https://youtu.be/abc12345678');
     await processSermon('abc12345678', 'https://youtu.be/abc12345678');
@@ -80,7 +110,9 @@ describe('processSermon', () => {
       channel: 'c',
       upload_date: '20260426',
     });
-    vi.mocked(fetchSubtitles).mockResolvedValue('짧음');
+    vi.mocked(fetchSubtitleSegments).mockResolvedValue([
+      { idx: 0, ts: 0, text: '짧음' },
+    ]);
 
     createSermon('abc12345678', 'https://youtu.be/abc12345678');
     await processSermon('abc12345678', 'https://youtu.be/abc12345678');

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extractVideoId, parseVtt } from './youtube';
+import { extractVideoId, parseVtt, parseVttSegments } from './youtube';
 
 describe('extractVideoId', () => {
   it.each([
@@ -63,5 +63,62 @@ Language: ko
   it('returns empty string for empty input', () => {
     expect(parseVtt('')).toBe('');
     expect(parseVtt('WEBVTT\n')).toBe('');
+  });
+});
+
+describe('parseVttSegments', () => {
+  it('returns timestamped segments with sequential idx', () => {
+    const vtt = `WEBVTT
+
+00:00:05.240 --> 00:00:08.000
+첫 문장
+
+00:01:30.500 --> 00:01:33.000
+두 번째 문장`;
+
+    const segs = parseVttSegments(vtt);
+    expect(segs).toHaveLength(2);
+    expect(segs[0]).toEqual({ idx: 0, ts: 5.24, text: '첫 문장' });
+    expect(segs[1].idx).toBe(1);
+    expect(segs[1].ts).toBeCloseTo(90.5, 2);
+    expect(segs[1].text).toBe('두 번째 문장');
+  });
+
+  it('decodes html entities and strips speaker-change markers', () => {
+    const vtt = `WEBVTT
+
+00:00:01.000 --> 00:00:03.000
+&gt;&gt; 아멘
+
+00:00:03.000 --> 00:00:05.000
+&gt;&gt;&gt; 더 사랑하기를 원합니다.
+
+00:00:05.000 --> 00:00:07.000
+A &amp; B &lt;C&gt;`;
+
+    const segs = parseVttSegments(vtt);
+    expect(segs.map((s) => s.text)).toEqual([
+      '아멘',
+      '더 사랑하기를 원합니다.',
+      'A & B <C>',
+    ]);
+  });
+
+  it('skips immediate duplicates while preserving timestamps', () => {
+    const vtt = `WEBVTT
+
+00:00:01.000 --> 00:00:03.000
+청지기 정신
+
+00:00:03.000 --> 00:00:05.000
+청지기 정신
+
+00:00:05.000 --> 00:00:07.000
+이라는 것은`;
+
+    const segs = parseVttSegments(vtt);
+    expect(segs.map((s) => s.text)).toEqual(['청지기 정신', '이라는 것은']);
+    expect(segs[0].ts).toBe(1);
+    expect(segs[1].ts).toBe(5);
   });
 });

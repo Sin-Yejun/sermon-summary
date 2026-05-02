@@ -1,13 +1,18 @@
-import { fetchSubtitles, fetchVideoMetadata } from './youtube';
+import { fetchSubtitleSegments, fetchVideoMetadata } from './youtube';
 import { parseSermonMetadata } from './metadata';
 import { summarizeSermon } from './summarize';
 import { updateSermon } from './db';
+import type { TranscriptSegment } from './types';
 
 const MIN_TRANSCRIPT_LENGTH = 500;
 
 function ytDateToIso(d: string | undefined): string | null {
   if (!d || !/^\d{8}$/.test(d)) return null;
   return `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`;
+}
+
+function segmentsToText(segments: TranscriptSegment[]): string {
+  return segments.map((s) => s.text).join(' ');
 }
 
 export async function processSermon(
@@ -29,15 +34,19 @@ export async function processSermon(
     });
 
     updateSermon(videoId, { status: 'transcribing' });
-    const transcript = await fetchSubtitles(url);
+    const segments = await fetchSubtitleSegments(url);
+    const transcript = segmentsToText(segments);
     if (transcript.length < MIN_TRANSCRIPT_LENGTH) {
       throw new Error('자막이 너무 짧거나 비정상입니다.');
     }
-    updateSermon(videoId, { transcript });
+    updateSermon(videoId, {
+      transcript,
+      transcriptSegments: JSON.stringify(segments),
+    });
 
     updateSermon(videoId, { status: 'summarizing' });
-    const summaryMarkdown = await summarizeSermon({
-      transcript,
+    const summaryDoc = await summarizeSermon({
+      segments,
       meta: {
         title: parsed.title ?? ytMeta.title,
         bibleReference: parsed.bibleReference,
@@ -45,7 +54,11 @@ export async function processSermon(
         sermonDate: parsed.sermonDate,
       },
     });
-    updateSermon(videoId, { summaryMarkdown, status: 'done' });
+
+    updateSermon(videoId, {
+      summaryJson: JSON.stringify(summaryDoc),
+      status: 'done',
+    });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     updateSermon(videoId, { status: 'failed', errorMessage: message });
