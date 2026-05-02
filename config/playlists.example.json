@@ -1,0 +1,16 @@
+{
+  "churches": [
+    {
+      "id": "bwmc",
+      "name": "분당우리교회",
+      "shortName": "BWMC",
+      "playlistUrl": "https://www.youtube.com/playlist?list=PLxxxxxxxxxxxxxxxx"
+    },
+    {
+      "id": "onnuri",
+      "name": "온누리교회",
+      "shortName": "Onnuri",
+      "playlistUrl": "https://www.youtube.com/playlist?list=PLxxxxxxxxxxxxxxxx"
+    }
+  ]
+}

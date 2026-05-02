@@ -2,6 +2,7 @@ import { fetchSubtitleSegments, fetchVideoMetadata } from './youtube';
 import { parseSermonMetadata } from './metadata';
 import { summarizeSermon } from './summarize';
 import { updateSermon } from './db';
+import { weekOfFor } from './week';
 import type { TranscriptSegment } from './types';
 
 const MIN_TRANSCRIPT_LENGTH = 500;
@@ -23,6 +24,9 @@ export async function processSermon(
     updateSermon(videoId, { status: 'fetching_metadata' });
     const ytMeta = await fetchVideoMetadata(url);
     const parsed = parseSermonMetadata(ytMeta.description);
+    const publishedAt = ytDateToIso(ytMeta.upload_date);
+    const weekOf =
+      weekOfFor(parsed.sermonDate ?? '') ?? weekOfFor(publishedAt ?? '');
     updateSermon(videoId, {
       title: parsed.title ?? ytMeta.title,
       channelName: parsed.channelName ?? ytMeta.channel,
@@ -30,7 +34,8 @@ export async function processSermon(
       preacher: parsed.preacher,
       bibleReference: parsed.bibleReference,
       durationSeconds: ytMeta.duration,
-      publishedAt: ytDateToIso(ytMeta.upload_date),
+      publishedAt,
+      weekOf,
     });
 
     updateSermon(videoId, { status: 'transcribing' });

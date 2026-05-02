@@ -9,6 +9,8 @@ const SCHEMA = `
     url TEXT NOT NULL,
     status TEXT NOT NULL,
     errorMessage TEXT,
+    playlistId TEXT,
+    weekOf TEXT,
     title TEXT,
     channelName TEXT,
     publishedAt TEXT,
@@ -25,9 +27,16 @@ const SCHEMA = `
   );
 `;
 
+const INDEXES = `
+  CREATE INDEX IF NOT EXISTS idx_sermons_weekOf ON sermons(weekOf);
+  CREATE INDEX IF NOT EXISTS idx_sermons_playlistId ON sermons(playlistId);
+`;
+
 const ADDED_COLUMNS: Array<{ name: string; ddl: string }> = [
   { name: 'transcriptSegments', ddl: 'ALTER TABLE sermons ADD COLUMN transcriptSegments TEXT' },
   { name: 'summaryJson', ddl: 'ALTER TABLE sermons ADD COLUMN summaryJson TEXT' },
+  { name: 'playlistId', ddl: 'ALTER TABLE sermons ADD COLUMN playlistId TEXT' },
+  { name: 'weekOf', ddl: 'ALTER TABLE sermons ADD COLUMN weekOf TEXT' },
 ];
 
 function migrate(db: Database.Database): void {
@@ -51,6 +60,7 @@ export function createDb(opts: { reset?: boolean } = {}): Database.Database {
   _db.pragma('journal_mode = WAL');
   _db.exec(SCHEMA);
   migrate(_db);
+  _db.exec(INDEXES);
   return _db;
 }
 
@@ -63,6 +73,8 @@ const COLUMNS = [
   'url',
   'status',
   'errorMessage',
+  'playlistId',
+  'weekOf',
   'title',
   'channelName',
   'publishedAt',
@@ -93,18 +105,48 @@ export function listSermons(): Sermon[] {
     .all() as Sermon[];
 }
 
+export function listSermonsByWeek(weekOf: string): Sermon[] {
+  return getDb()
+    .prepare(
+      `SELECT ${COLUMNS.join(', ')} FROM sermons
+       WHERE weekOf = ?
+       ORDER BY playlistId, createdAt DESC`,
+    )
+    .all(weekOf) as Sermon[];
+}
+
+export interface WeekBucket {
+  weekOf: string;
+  count: number;
+}
+
+export function listWeeks(): WeekBucket[] {
+  return getDb()
+    .prepare(
+      `SELECT weekOf, COUNT(*) as count FROM sermons
+       WHERE weekOf IS NOT NULL
+       GROUP BY weekOf
+       ORDER BY weekOf DESC`,
+    )
+    .all() as WeekBucket[];
+}
+
 export function deleteSermon(videoId: string): void {
   getDb().prepare(`DELETE FROM sermons WHERE videoId = ?`).run(videoId);
 }
 
-export function createSermon(videoId: string, url: string): void {
+export function createSermon(
+  videoId: string,
+  url: string,
+  opts: { playlistId?: string | null } = {},
+): void {
   const now = new Date().toISOString();
   getDb()
     .prepare(
-      `INSERT INTO sermons (videoId, url, status, createdAt, updatedAt)
-       VALUES (?, ?, 'pending', ?, ?)`,
+      `INSERT INTO sermons (videoId, url, status, playlistId, createdAt, updatedAt)
+       VALUES (?, ?, 'pending', ?, ?, ?)`,
     )
-    .run(videoId, url, now, now);
+    .run(videoId, url, opts.playlistId ?? null, now, now);
 }
 
 export function updateSermon(videoId: string, fields: SermonUpdate): void {
