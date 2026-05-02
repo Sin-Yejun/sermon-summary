@@ -1,38 +1,31 @@
-import { listSermons } from '@/lib/db';
-import SermonCard from './sermon-card';
-import UrlForm from './url-form';
+import { redirect } from 'next/navigation';
+import { listWeeks } from '@/lib/db';
+import LibraryShell from './library-shell';
 
 export const dynamic = 'force-dynamic';
 
 export default function HomePage() {
-  const sermons = listSermons();
+  const weeks = listWeeks();
+  if (weeks.length > 0) {
+    redirect(`/week/${weeks[0].weekOf}`);
+  }
   return (
-    <main className="mx-auto max-w-5xl px-6 py-12">
-      <h1 className="mb-2 text-3xl font-semibold tracking-tight">
-        Sermon Summary
-      </h1>
-      <p className="mb-8 text-sm text-gray-500">
-        YouTube 설교 영상 URL을 붙여넣으면 구조화된 요약을 생성합니다.
-      </p>
-
-      <section className="mb-12">
-        <UrlForm />
-      </section>
-
-      <section>
-        <h2 className="mb-4 text-lg font-semibold">라이브러리</h2>
-        {sermons.length === 0 ? (
-          <p className="text-sm text-gray-500">
-            아직 요약한 영상이 없어요. 위에서 URL을 붙여넣어 시작하세요.
-          </p>
-        ) : (
-          <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {sermons.map((s) => (
-              <SermonCard key={s.videoId} sermon={s} />
-            ))}
-          </ul>
-        )}
-      </section>
-    </main>
+    <LibraryShell weeks={weeks}>
+      <div className="mx-auto max-w-2xl px-6 py-16">
+        <h1 className="mb-3 text-2xl font-semibold tracking-tight">
+          아직 비어있어요
+        </h1>
+        <p className="mb-6 text-sm text-gray-500">
+          <code className="rounded bg-gray-100 px-1 py-0.5 text-xs">
+            config/playlists.json
+          </code>{' '}
+          에 교회를 등록한 뒤{' '}
+          <code className="rounded bg-gray-100 px-1 py-0.5 text-xs">
+            POST /api/ingest
+          </code>{' '}
+          를 호출하면 이번 주 설교가 채워집니다.
+        </p>
+      </div>
+    </LibraryShell>
   );
 }
