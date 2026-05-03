@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import IngestButton from './ingest-button';
 import type { WeekBucket } from '@/lib/db';
 
 export default function Sidebar({ weeks }: { weeks: WeekBucket[] }) {
@@ -58,10 +59,11 @@ export default function Sidebar({ weeks }: { weeks: WeekBucket[] }) {
         )}
       </nav>
 
-      <div className="border-t border-gray-200 px-5 py-4">
+      <div className="space-y-3 border-t border-gray-200 px-4 py-4">
+        <IngestButton />
         <Link
           href="/manual"
-          className="text-xs text-gray-500 hover:underline"
+          className="block text-xs text-gray-500 hover:underline"
         >
           수동 추가 →
         </Link>

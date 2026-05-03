@@ -1,7 +1,8 @@
 'use client';
 
+import Link from 'next/link';
 import { use, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { fmtTs } from '@/lib/format';
+import { errorMessage, fmtTs } from '@/lib/format';
 import type {
   Sermon,
   SummaryBullet,
@@ -35,6 +36,34 @@ const STATUS_LABELS: Record<string, string> = {
   transcribing: '자막을 가져오는 중',
   summarizing: '요약을 생성하는 중',
 };
+
+function BackLink({ weekOf }: { weekOf?: string | null }) {
+  const href = weekOf ? `/week/${weekOf}` : '/';
+  const label = weekOf ? `← ${weekOf} 주차` : '← 홈';
+  return (
+    <Link
+      href={href}
+      className="inline-block text-sm text-gray-500 hover:text-gray-900 hover:underline"
+    >
+      {label}
+    </Link>
+  );
+}
+
+function StatusShell({
+  weekOf,
+  children,
+}: {
+  weekOf?: string | null;
+  children: React.ReactNode;
+}) {
+  return (
+    <main className="mx-auto max-w-3xl px-6 py-16">
+      <BackLink weekOf={weekOf} />
+      <div className="mt-6">{children}</div>
+    </main>
+  );
+}
 
 interface SegmentGroup {
   ts: number;
@@ -117,7 +146,7 @@ export default function SermonPage({
           timer = setTimeout(tick, 1500);
         }
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+        if (!cancelled) setError(errorMessage(e));
       }
     }
     tick();
@@ -129,34 +158,36 @@ export default function SermonPage({
 
   if (error) {
     return (
-      <main className="mx-auto max-w-3xl px-6 py-16 text-red-600">{error}</main>
+      <StatusShell>
+        <p className="text-red-600">{error}</p>
+      </StatusShell>
     );
   }
   if (!sermon) {
     return (
-      <main className="mx-auto max-w-3xl px-6 py-16 text-gray-500">
-        불러오는 중…
-      </main>
+      <StatusShell>
+        <p className="text-gray-500">불러오는 중…</p>
+      </StatusShell>
     );
   }
   if (sermon.status === 'failed') {
     return (
-      <main className="mx-auto max-w-3xl px-6 py-16">
+      <StatusShell weekOf={sermon.weekOf}>
         <h1 className="mb-4 text-xl font-semibold">처리 실패</h1>
         <p className="text-red-600">{sermon.errorMessage ?? '알 수 없는 오류'}</p>
-      </main>
+      </StatusShell>
     );
   }
   if (sermon.status !== 'done') {
     return (
-      <main className="mx-auto max-w-3xl px-6 py-16">
+      <StatusShell weekOf={sermon.weekOf}>
         <p className="text-gray-700">
           {STATUS_LABELS[sermon.status] ?? sermon.status}…
         </p>
         <p className="mt-2 text-sm text-gray-400">
           처리에는 보통 1~2분 정도 소요됩니다.
         </p>
-      </main>
+      </StatusShell>
     );
   }
 
@@ -253,10 +284,13 @@ function DoneView({ sermon }: { sermon: Sermon }) {
 
   useEffect(() => {
     if (groups.length === 0) return;
+    let lastCt = -1;
     const id = setInterval(() => {
       const p = playerRef.current;
       const ct = p?.getCurrentTime?.();
       if (typeof ct !== 'number' || Number.isNaN(ct)) return;
+      if (ct === lastCt) return;
+      lastCt = ct;
       let gi = -1;
       for (let i = 0; i < groups.length; i++) {
         if (groups[i].ts <= ct) gi = i;
@@ -281,6 +315,9 @@ function DoneView({ sermon }: { sermon: Sermon }) {
   return (
     <main className="mx-auto grid max-w-[1400px] grid-cols-1 gap-6 px-4 py-6 lg:grid-cols-[minmax(0,1fr)_380px]">
       <div className="min-w-0">
+        <div className="mb-3">
+          <BackLink weekOf={sermon.weekOf} />
+        </div>
         <SermonHeader sermon={sermon} />
 
         <div className="mb-6 overflow-hidden rounded-lg border border-gray-200 bg-black aspect-video">
