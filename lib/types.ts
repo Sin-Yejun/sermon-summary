@@ -47,6 +47,7 @@ export interface Sermon {
   status: SermonStatus;
   errorMessage: string | null;
   playlistId: string | null;
+  playlistSlug: string | null;
   weekOf: string | null;
   title: string | null;
   channelName: string | null;

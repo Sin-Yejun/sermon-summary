@@ -1,3 +1,5 @@
+import type { MetadataRule, MetadataRules } from './playlists';
+
 export interface SermonMeta {
   sermonDate: string | null;
   channelName: string | null;
@@ -6,12 +8,55 @@ export interface SermonMeta {
   preacher: string | null;
 }
 
-const DATE_RE = /^(\d{4}-\d{2}-\d{2})$/;
-const CHANNEL_RE = /^(.+?)\s*주일설교$/;
-const TITLE_REF_RE = /^(.+?)\s*\(([^()]+)\)\s*$/;
-const PREACHER_RE = /^(.+?\s*목사)$/;
+export interface SermonMetaInput {
+  description: string;
+  title?: string;
+  channel?: string;
+}
 
-export function parseSermonMetadata(description: string): SermonMeta {
+const FIELD_KEYS = [
+  'title',
+  'bibleReference',
+  'preacher',
+  'sermonDate',
+  'channelName',
+] as const;
+
+const DEFAULT_FLAGS = 'm';
+
+function pickSource(
+  input: SermonMetaInput,
+  from: MetadataRule['from'],
+): string {
+  if (from === 'title') return input.title ?? '';
+  if (from === 'channel') return input.channel ?? '';
+  return input.description;
+}
+
+function applyRule(
+  input: SermonMetaInput,
+  rule: MetadataRule,
+): string | null {
+  const source = pickSource(input, rule.from);
+  if (!source) return null;
+  let regex: RegExp;
+  try {
+    regex = new RegExp(rule.regex, rule.flags ?? DEFAULT_FLAGS);
+  } catch {
+    return null;
+  }
+  const m = source.match(regex);
+  if (!m) return null;
+  const value = rule.format
+    ? m[0].replace(regex, rule.format).trim()
+    : (m[rule.group ?? 1] ?? '').trim();
+  return value || null;
+}
+
+export function parseSermonMetadata(
+  input: SermonMetaInput,
+  rules: MetadataRules,
+): SermonMeta {
   const meta: SermonMeta = {
     sermonDate: null,
     channelName: null,
@@ -19,42 +64,9 @@ export function parseSermonMetadata(description: string): SermonMeta {
     bibleReference: null,
     preacher: null,
   };
-  const lines = description
-    .split('\n')
-    .map((l) => l.trim())
-    .filter(Boolean)
-    .slice(0, 12);
-
-  for (const line of lines) {
-    if (!meta.sermonDate) {
-      const m = line.match(DATE_RE);
-      if (m) {
-        meta.sermonDate = m[1];
-        continue;
-      }
-    }
-    if (!meta.channelName) {
-      const m = line.match(CHANNEL_RE);
-      if (m) {
-        meta.channelName = m[1].trim();
-        continue;
-      }
-    }
-    if (!meta.title) {
-      const m = line.match(TITLE_REF_RE);
-      if (m) {
-        meta.title = m[1].trim();
-        meta.bibleReference = m[2].trim();
-        continue;
-      }
-    }
-    if (!meta.preacher) {
-      const m = line.match(PREACHER_RE);
-      if (m) {
-        meta.preacher = m[1].trim();
-        continue;
-      }
-    }
+  for (const key of FIELD_KEYS) {
+    const rule = rules[key];
+    if (rule) meta[key] = applyRule(input, rule);
   }
   return meta;
 }

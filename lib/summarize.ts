@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from '@google/genai';
-import { fmtTs } from './format';
+import { errorMessage, fmtTs } from './format';
 import type {
   SummaryBullet,
   SummaryDoc,
@@ -210,9 +210,7 @@ async function callJson<T>(args: {
   try {
     return JSON.parse(text) as T;
   } catch (e) {
-    throw new Error(
-      `Gemini JSON 파싱 실패: ${e instanceof Error ? e.message : String(e)}`,
-    );
+    throw new Error(`Gemini JSON 파싱 실패: ${errorMessage(e)}`);
   }
 }
 

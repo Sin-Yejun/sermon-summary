@@ -1,3 +1,113 @@
 {
-  "churches": []
+  "churches": [
+    {
+      "id": "bwmc",
+      "name": "분당우리교회",
+      "shortName": "BWMC",
+      "metadata": {
+        "sermonDate": { "regex": "^(\\d{4}-\\d{2}-\\d{2})$" },
+        "channelName": { "regex": "^(.+?)\\s*주일설교$" },
+        "title": { "regex": "^(.+?)\\s*\\(([^()]+)\\)\\s*$" },
+        "bibleReference": { "regex": "^(.+?)\\s*\\(([^()]+)\\)\\s*$", "group": 2 },
+        "preacher": { "regex": "^(.+?\\s*목사)$" }
+      },
+      "playlists": [
+        {
+          "slug": "bwmc-main",
+          "url": "https://www.youtube.com/playlist?list=PLn3gC0zxOsmwrme5FuzqiY1FMpw6pGtiD"
+        },
+        {
+          "slug": "bwmc-youth1",
+          "url": "https://www.youtube.com/playlist?list=PLJeoJpGnzP1kEY3PZ9ChleBjxtuPNU1hb",
+          "titleIncludes": "1청년부 연합",
+          "metadata": {
+            "sermonDate": {
+              "from": "title",
+              "regex": "^(\\d{4}-\\d{2}-\\d{2})\\s*\\|"
+            },
+            "title": {
+              "from": "title",
+              "regex": "\\|\\s*\\d청년부[^|]*\\|\\s*(.+?)\\s*\\|"
+            },
+            "bibleReference": {
+              "from": "title",
+              "regex": "\\|\\s*([^|]+)\\s*\\|\\s*[^|]+목사\\s*$"
+            },
+            "preacher": {
+              "from": "title",
+              "regex": "\\|\\s*([^|]+목사)\\s*$"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "uhpc",
+      "name": "울산화평교회",
+      "shortName": "UHPC",
+      "metadata": {
+        "sermonDate": {
+          "from": "title",
+          "regex": "(\\d{4})\\.(\\d{2})\\.(\\d{2})",
+          "format": "$1-$2-$3"
+        },
+        "channelName": {
+          "from": "title",
+          "regex": "^\\[([^\\]]+)\\]"
+        },
+        "title": {
+          "from": "title",
+          "regex": "예배\\s*\\|\\s*(.+?)\\s*\\("
+        },
+        "bibleReference": {
+          "from": "title",
+          "regex": "\\(([^()]+)\\)"
+        },
+        "preacher": {
+          "from": "title",
+          "regex": "\\|\\s*([^|]+목사)\\s*$"
+        }
+      },
+      "playlists": [
+        {
+          "slug": "uhpc-main",
+          "url": "https://www.youtube.com/playlist?list=PL2oWvLywR6GY7sGBApCWa5mcai02Jo001"
+        }
+      ]
+    },
+    {
+      "id": "mpsr",
+      "name": "목포사랑의교회",
+      "shortName": "MPSR",
+      "metadata": {
+        "sermonDate": {
+          "from": "title",
+          "regex": "(\\d{2})\\.(\\d{2})\\.(\\d{2})\\.주일",
+          "format": "20$1-$2-$3"
+        },
+        "channelName": {
+          "from": "title",
+          "regex": "^\\[([^\\]]+)\\]"
+        },
+        "title": {
+          "from": "title",
+          "regex": "주일\\s*-\\s*(.+?)\\s*/"
+        },
+        "bibleReference": {
+          "from": "title",
+          "regex": "/\\s*([^\\[]+?)\\s*\\["
+        },
+        "preacher": {
+          "from": "title",
+          "regex": "\\[([^\\]]+목사)\\]\\s*$"
+        }
+      },
+      "playlists": [
+        {
+          "slug": "mpsr-main",
+          "url": "https://www.youtube.com/playlist?list=PLr1mf04SnCkTPfiBSX2FrOPHIMDGpknCy"
+        }
+      ]
+    }
+  ]
 }

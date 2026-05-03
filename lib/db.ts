@@ -10,6 +10,7 @@ const SCHEMA = `
     status TEXT NOT NULL,
     errorMessage TEXT,
     playlistId TEXT,
+    playlistSlug TEXT,
     weekOf TEXT,
     title TEXT,
     channelName TEXT,
@@ -36,6 +37,7 @@ const ADDED_COLUMNS: Array<{ name: string; ddl: string }> = [
   { name: 'transcriptSegments', ddl: 'ALTER TABLE sermons ADD COLUMN transcriptSegments TEXT' },
   { name: 'summaryJson', ddl: 'ALTER TABLE sermons ADD COLUMN summaryJson TEXT' },
   { name: 'playlistId', ddl: 'ALTER TABLE sermons ADD COLUMN playlistId TEXT' },
+  { name: 'playlistSlug', ddl: 'ALTER TABLE sermons ADD COLUMN playlistSlug TEXT' },
   { name: 'weekOf', ddl: 'ALTER TABLE sermons ADD COLUMN weekOf TEXT' },
 ];
 
@@ -74,6 +76,7 @@ const COLUMNS = [
   'status',
   'errorMessage',
   'playlistId',
+  'playlistSlug',
   'weekOf',
   'title',
   'channelName',
@@ -138,15 +141,22 @@ export function deleteSermon(videoId: string): void {
 export function createSermon(
   videoId: string,
   url: string,
-  opts: { playlistId?: string | null } = {},
+  opts: { playlistId?: string | null; playlistSlug?: string | null } = {},
 ): void {
   const now = new Date().toISOString();
   getDb()
     .prepare(
-      `INSERT INTO sermons (videoId, url, status, playlistId, createdAt, updatedAt)
-       VALUES (?, ?, 'pending', ?, ?, ?)`,
+      `INSERT INTO sermons (videoId, url, status, playlistId, playlistSlug, createdAt, updatedAt)
+       VALUES (?, ?, 'pending', ?, ?, ?, ?)`,
     )
-    .run(videoId, url, opts.playlistId ?? null, now, now);
+    .run(
+      videoId,
+      url,
+      opts.playlistId ?? null,
+      opts.playlistSlug ?? null,
+      now,
+      now,
+    );
 }
 
 export function updateSermon(videoId: string, fields: SermonUpdate): void {

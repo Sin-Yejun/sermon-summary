@@ -1,8 +1,10 @@
 import { fetchSubtitleSegments, fetchVideoMetadata } from './youtube';
 import { parseSermonMetadata } from './metadata';
 import { summarizeSermon } from './summarize';
-import { updateSermon } from './db';
+import { getSermon, updateSermon } from './db';
 import { weekOfFor } from './week';
+import { findMetadataRules } from './playlists';
+import { errorMessage } from './format';
 import type { TranscriptSegment } from './types';
 
 const MIN_TRANSCRIPT_LENGTH = 500;
@@ -23,7 +25,19 @@ export async function processSermon(
   try {
     updateSermon(videoId, { status: 'fetching_metadata' });
     const ytMeta = await fetchVideoMetadata(url);
-    const parsed = parseSermonMetadata(ytMeta.description);
+    const sermonRow = getSermon(videoId);
+    const rules = findMetadataRules(
+      sermonRow?.playlistId ?? null,
+      sermonRow?.playlistSlug ?? null,
+    );
+    const parsed = parseSermonMetadata(
+      {
+        description: ytMeta.description,
+        title: ytMeta.title,
+        channel: ytMeta.channel,
+      },
+      rules,
+    );
     const publishedAt = ytDateToIso(ytMeta.upload_date);
     const weekOf =
       weekOfFor(parsed.sermonDate ?? '') ?? weekOfFor(publishedAt ?? '');
@@ -65,7 +79,6 @@ export async function processSermon(
       status: 'done',
     });
   } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
-    updateSermon(videoId, { status: 'failed', errorMessage: message });
+    updateSermon(videoId, { status: 'failed', errorMessage: errorMessage(e) });
   }
 }
