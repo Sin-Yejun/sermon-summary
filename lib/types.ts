@@ -58,12 +58,26 @@ export interface Sermon {
   durationSeconds: number | null;
   transcript: string | null;
   transcriptSegments: string | null;
-  summaryMarkdown: string | null;
   summaryJson: string | null;
+  summaryTldr: string | null;
   createdAt: string;
   updatedAt: string;
 }
 
 export type SermonUpdate = Partial<
   Omit<Sermon, 'videoId' | 'url' | 'createdAt'>
+>;
+
+export type SermonCardData = Pick<
+  Sermon,
+  | 'videoId'
+  | 'status'
+  | 'playlistId'
+  | 'weekOf'
+  | 'title'
+  | 'channelName'
+  | 'preacher'
+  | 'bibleReference'
+  | 'sermonDate'
+  | 'summaryTldr'
 >;

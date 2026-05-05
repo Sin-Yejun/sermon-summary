@@ -1,4 +1,4 @@
-import { listSermonsByWeek, listWeeks } from '@/lib/db';
+import { listSermonCardsByWeek, listWeeks } from '@/lib/db';
 import { loadChurches, type Church } from '@/lib/playlists';
 import LibraryShell from '@/app/library-shell';
 import WeekView from './week-view';
@@ -12,7 +12,7 @@ export default async function WeekPage({
 }) {
   const { weekOf } = await params;
   const weeks = listWeeks();
-  const sermons = listSermonsByWeek(weekOf);
+  const sermons = listSermonCardsByWeek(weekOf);
   let churches: Church[] = [];
   try {
     churches = loadChurches();

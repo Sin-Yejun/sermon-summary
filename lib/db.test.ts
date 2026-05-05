@@ -17,7 +17,7 @@ describe('db', () => {
     expect(s).not.toBeNull();
     expect(s!.videoId).toBe('abc12345678');
     expect(s!.status).toBe('pending');
-    expect(s!.summaryMarkdown).toBeNull();
+    expect(s!.summaryJson).toBeNull();
   });
 
   it('updates fields atomically', () => {

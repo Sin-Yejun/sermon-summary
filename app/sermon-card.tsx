@@ -2,8 +2,8 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useMemo, useState } from 'react';
-import type { Sermon, SummaryDoc } from '@/lib/types';
+import { useState } from 'react';
+import type { SermonCardData } from '@/lib/types';
 
 export type Density = 'comfortable' | 'compact';
 
@@ -20,7 +20,7 @@ export default function SermonCard({
   density = 'comfortable',
   churchName,
 }: {
-  sermon: Sermon;
+  sermon: SermonCardData;
   density?: Density;
   churchName?: string;
 }) {
@@ -31,16 +31,7 @@ export default function SermonCard({
     ? null
     : STATUS_LABELS[sermon.status] ?? sermon.status;
   const compact = density === 'compact';
-
-  const tldr = useMemo(() => {
-    if (compact || !sermon.summaryJson) return null;
-    try {
-      const doc = JSON.parse(sermon.summaryJson) as SummaryDoc;
-      return doc.tldr?.trim() || null;
-    } catch {
-      return null;
-    }
-  }, [compact, sermon.summaryJson]);
+  const tldr = compact ? null : sermon.summaryTldr?.trim() || null;
 
   async function onDelete(e: React.MouseEvent) {
     e.preventDefault();

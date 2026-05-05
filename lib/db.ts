@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import type { Sermon, SermonUpdate } from './types';
+import type { Sermon, SermonCardData, SermonUpdate } from './types';
 
 let _db: Database.Database | null = null;
 
@@ -21,8 +21,8 @@ const SCHEMA = `
     durationSeconds INTEGER,
     transcript TEXT,
     transcriptSegments TEXT,
-    summaryMarkdown TEXT,
     summaryJson TEXT,
+    summaryTldr TEXT,
     createdAt TEXT NOT NULL,
     updatedAt TEXT NOT NULL
   );
@@ -32,24 +32,6 @@ const INDEXES = `
   CREATE INDEX IF NOT EXISTS idx_sermons_weekOf ON sermons(weekOf);
   CREATE INDEX IF NOT EXISTS idx_sermons_playlistId ON sermons(playlistId);
 `;
-
-const ADDED_COLUMNS: Array<{ name: string; ddl: string }> = [
-  { name: 'transcriptSegments', ddl: 'ALTER TABLE sermons ADD COLUMN transcriptSegments TEXT' },
-  { name: 'summaryJson', ddl: 'ALTER TABLE sermons ADD COLUMN summaryJson TEXT' },
-  { name: 'playlistId', ddl: 'ALTER TABLE sermons ADD COLUMN playlistId TEXT' },
-  { name: 'playlistSlug', ddl: 'ALTER TABLE sermons ADD COLUMN playlistSlug TEXT' },
-  { name: 'weekOf', ddl: 'ALTER TABLE sermons ADD COLUMN weekOf TEXT' },
-];
-
-function migrate(db: Database.Database): void {
-  const cols = db.prepare(`PRAGMA table_info(sermons)`).all() as Array<{
-    name: string;
-  }>;
-  const have = new Set(cols.map((c) => c.name));
-  for (const { name, ddl } of ADDED_COLUMNS) {
-    if (!have.has(name)) db.exec(ddl);
-  }
-}
 
 export function createDb(opts: { reset?: boolean } = {}): Database.Database {
   if (_db && !opts.reset) return _db;
@@ -61,7 +43,6 @@ export function createDb(opts: { reset?: boolean } = {}): Database.Database {
   _db = new Database(path);
   _db.pragma('journal_mode = WAL');
   _db.exec(SCHEMA);
-  migrate(_db);
   _db.exec(INDEXES);
   return _db;
 }
@@ -87,10 +68,23 @@ const COLUMNS = [
   'durationSeconds',
   'transcript',
   'transcriptSegments',
-  'summaryMarkdown',
   'summaryJson',
+  'summaryTldr',
   'createdAt',
   'updatedAt',
+] as const;
+
+const CARD_COLUMNS = [
+  'videoId',
+  'status',
+  'playlistId',
+  'weekOf',
+  'title',
+  'channelName',
+  'preacher',
+  'bibleReference',
+  'sermonDate',
+  'summaryTldr',
 ] as const;
 
 export function getSermon(videoId: string): Sermon | null {
@@ -100,22 +94,14 @@ export function getSermon(videoId: string): Sermon | null {
   return row ?? null;
 }
 
-export function listSermons(): Sermon[] {
+export function listSermonCardsByWeek(weekOf: string): SermonCardData[] {
   return getDb()
     .prepare(
-      `SELECT ${COLUMNS.join(', ')} FROM sermons ORDER BY createdAt DESC`,
-    )
-    .all() as Sermon[];
-}
-
-export function listSermonsByWeek(weekOf: string): Sermon[] {
-  return getDb()
-    .prepare(
-      `SELECT ${COLUMNS.join(', ')} FROM sermons
+      `SELECT ${CARD_COLUMNS.join(', ')} FROM sermons
        WHERE weekOf = ?
        ORDER BY playlistId, createdAt DESC`,
     )
-    .all(weekOf) as Sermon[];
+    .all(weekOf) as SermonCardData[];
 }
 
 export interface WeekBucket {

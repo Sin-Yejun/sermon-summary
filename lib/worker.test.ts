@@ -77,6 +77,7 @@ describe('processSermon', () => {
     expect(s!.transcript).toMatch(/^자막 본문/);
     expect(s!.transcriptSegments).toMatch(/"idx":0/);
     expect(s!.summaryJson).toBeTruthy();
+    expect(s!.summaryTldr).toBe('핵심 요약');
     const doc = JSON.parse(s!.summaryJson!) as SummaryDoc;
     expect(doc.sections[0].subsections[0].startTs).toBe(5);
     expect(s!.errorMessage).toBeNull();

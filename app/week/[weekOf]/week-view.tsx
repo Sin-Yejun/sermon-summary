@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import SermonCard, { type Density } from '@/app/sermon-card';
 import type { Church } from '@/lib/playlists';
-import type { Sermon } from '@/lib/types';
+import type { SermonCardData } from '@/lib/types';
 
 const STORAGE_KEY = 'sermon:density';
 
@@ -18,7 +18,7 @@ export default function WeekView({
   churches,
 }: {
   weekOf: string;
-  sermons: Sermon[];
+  sermons: SermonCardData[];
   churches: Church[];
 }) {
   const [density, setDensity] = useState<Density>('compact');
@@ -32,7 +32,7 @@ export default function WeekView({
     window.localStorage.setItem(STORAGE_KEY, density);
   }, [density]);
 
-  const byChurch = new Map<string, Sermon[]>();
+  const byChurch = new Map<string, SermonCardData[]>();
   for (const s of sermons) {
     const key = s.playlistId ?? '__orphan__';
     if (!byChurch.has(key)) byChurch.set(key, []);

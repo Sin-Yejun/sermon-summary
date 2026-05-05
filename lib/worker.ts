@@ -76,6 +76,7 @@ export async function processSermon(
 
     updateSermon(videoId, {
       summaryJson: JSON.stringify(summaryDoc),
+      summaryTldr: summaryDoc.tldr?.trim() || null,
       status: 'done',
     });
   } catch (e) {
