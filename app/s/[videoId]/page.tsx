@@ -313,7 +313,7 @@ function DoneView({ sermon }: { sermon: Sermon }) {
   }, [groups]);
 
   return (
-    <main className="mx-auto grid max-w-[1400px] grid-cols-1 gap-6 px-4 py-6 lg:grid-cols-[minmax(0,1fr)_380px]">
+    <main className="mx-auto grid max-w-[1400px] grid-cols-1 gap-6 px-4 pt-6 pb-24 lg:grid-cols-[minmax(0,1fr)_380px]">
       <div className="min-w-0">
         <div className="mb-3">
           <BackLink weekOf={sermon.weekOf} />

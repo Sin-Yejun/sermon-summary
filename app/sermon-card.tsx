@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import type { Sermon } from '@/lib/types';
 
+export type Density = 'comfortable' | 'compact';
+
 const STATUS_LABELS: Record<string, string> = {
   pending: '대기 중',
   fetching_metadata: '영상 정보 가져오는 중',
@@ -13,13 +15,22 @@ const STATUS_LABELS: Record<string, string> = {
   failed: '실패',
 };
 
-export default function SermonCard({ sermon }: { sermon: Sermon }) {
+export default function SermonCard({
+  sermon,
+  density = 'comfortable',
+  churchName,
+}: {
+  sermon: Sermon;
+  density?: Density;
+  churchName?: string;
+}) {
   const router = useRouter();
   const [deleting, setDeleting] = useState(false);
   const isDone = sermon.status === 'done';
   const statusLabel = isDone
     ? null
     : STATUS_LABELS[sermon.status] ?? sermon.status;
+  const compact = density === 'compact';
 
   async function onDelete(e: React.MouseEvent) {
     e.preventDefault();
@@ -50,14 +61,20 @@ export default function SermonCard({ sermon }: { sermon: Sermon }) {
           alt=""
           className="aspect-video w-full bg-gray-100 object-cover"
         />
-        <div className="p-4">
-          <h3 className="mb-1 line-clamp-2 text-sm font-semibold leading-snug">
+        <div className={compact ? 'p-2' : 'p-3'}>
+          <h3
+            className={`mb-1 line-clamp-2 font-semibold leading-snug ${
+              compact ? 'text-xs' : 'text-sm'
+            }`}
+          >
             {sermon.title ?? '제목 미상'}
           </h3>
           <dl className="text-xs text-gray-500">
-            {sermon.preacher && <dd>{sermon.preacher}</dd>}
+            {!compact && sermon.preacher && (
+              <dd className="line-clamp-1">{sermon.preacher}</dd>
+            )}
+            {churchName && <dd className="line-clamp-1">{churchName}</dd>}
             {sermon.sermonDate && <dd>{sermon.sermonDate}</dd>}
-            {sermon.channelName && <dd>{sermon.channelName}</dd>}
           </dl>
           {statusLabel && (
             <p
