@@ -2,8 +2,8 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
-import type { Sermon } from '@/lib/types';
+import { useMemo, useState } from 'react';
+import type { Sermon, SummaryDoc } from '@/lib/types';
 
 export type Density = 'comfortable' | 'compact';
 
@@ -31,6 +31,16 @@ export default function SermonCard({
     ? null
     : STATUS_LABELS[sermon.status] ?? sermon.status;
   const compact = density === 'compact';
+
+  const tldr = useMemo(() => {
+    if (compact || !sermon.summaryJson) return null;
+    try {
+      const doc = JSON.parse(sermon.summaryJson) as SummaryDoc;
+      return doc.tldr?.trim() || null;
+    } catch {
+      return null;
+    }
+  }, [compact, sermon.summaryJson]);
 
   async function onDelete(e: React.MouseEvent) {
     e.preventDefault();
@@ -69,6 +79,11 @@ export default function SermonCard({
           >
             {sermon.title ?? '제목 미상'}
           </h3>
+          {!compact && sermon.bibleReference && (
+            <p className="mb-1 line-clamp-1 text-xs font-medium text-gray-700">
+              {sermon.bibleReference}
+            </p>
+          )}
           <dl className="text-xs text-gray-500">
             {!compact && sermon.preacher && (
               <dd className="line-clamp-1">{sermon.preacher}</dd>
@@ -76,6 +91,11 @@ export default function SermonCard({
             {churchName && <dd className="line-clamp-1">{churchName}</dd>}
             {sermon.sermonDate && <dd>{sermon.sermonDate}</dd>}
           </dl>
+          {tldr && (
+            <p className="mt-2 line-clamp-3 border-t border-gray-100 pt-2 text-xs leading-relaxed text-gray-600">
+              {tldr}
+            </p>
+          )}
           {statusLabel && (
             <p
               className={`mt-2 text-xs ${
