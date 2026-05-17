@@ -138,7 +138,7 @@ pending
 ## 6. LLM 프롬프트 설계
 
 ### 6.1 모델
-- **`gemini-3.1-flash-lite-preview`** (운영 시점에는 stable 버전으로 핀)
+- **`gemini-3.1-flash-lite`** (운영 시점에는 stable 버전으로 핀)
 - Context Caching이 모델에서 지원되면 시스템 프롬프트를 캐싱해 비용 절감
 
 ### 6.2 시스템 프롬프트 골자
@@ -219,7 +219,7 @@ YouTube 영상 설명 예시:
 | 프레임워크 | Next.js 14 App Router + TypeScript |
 | UI | Tailwind + shadcn/ui |
 | 마크다운 렌더 | `react-markdown` + `remark-gfm` |
-| LLM | Gemini `gemini-3.1-flash-lite-preview` (Google GenAI SDK) |
+| LLM | Gemini `gemini-3.1-flash-lite` (Google GenAI SDK) |
 | 자막/메타데이터 | `yt-dlp` (시스템 바이너리, 자식 프로세스 호출) |
 | DB | SQLite (`better-sqlite3`) |
 | 패키지 매니저 | pnpm |

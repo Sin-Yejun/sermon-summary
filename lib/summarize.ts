@@ -1,5 +1,6 @@
 import { GoogleGenAI, Type } from '@google/genai';
 import { errorMessage, fmtTs } from './format';
+import { addUsage, emptyUsage, extractUsage, type Usage } from './pricing';
 import type {
   SummaryBullet,
   SummaryDoc,
@@ -8,7 +9,7 @@ import type {
   TranscriptSegment,
 } from './types';
 
-const MODEL = 'gemini-3.1-flash-lite-preview';
+const MODEL = 'gemini-3.1-flash-lite';
 
 const SHARED_PRINCIPLES = `당신은 한국어 설교 요약 전문 어시스턴트입니다.
 설교 자막을 다룰 때 다음 원칙을 반드시 지킵니다.
@@ -192,7 +193,7 @@ async function callJson<T>(args: {
   contents: string;
   schema: object;
   maxOutputTokens?: number;
-}): Promise<T> {
+}): Promise<{ result: T; usage: Usage }> {
   const response = await client().models.generateContent({
     model: MODEL,
     contents: args.contents,
@@ -207,14 +208,17 @@ async function callJson<T>(args: {
   if (!text || text.trim().length === 0) {
     throw new Error('Gemini returned empty response');
   }
+  const usage = extractUsage(response.usageMetadata);
   try {
-    return JSON.parse(text) as T;
+    return { result: JSON.parse(text) as T, usage };
   } catch (e) {
     throw new Error(`Gemini JSON 파싱 실패: ${errorMessage(e)}`);
   }
 }
 
-async function extractOutline(args: SummarizeArgs): Promise<OutlineDraft> {
+async function extractOutline(
+  args: SummarizeArgs,
+): Promise<{ outline: OutlineDraft; usage: Usage }> {
   const { segments, meta } = args;
   const userMessage = `메타데이터:
 - 제목: ${meta.title ?? '미상'}
@@ -225,7 +229,7 @@ async function extractOutline(args: SummarizeArgs): Promise<OutlineDraft> {
 자막 세그먼트(총 ${segments.length}개):
 ${segmentsToPrompt(segments)}`;
 
-  const draft = await callJson<OutlineDraft>({
+  const { result: draft, usage } = await callJson<OutlineDraft>({
     systemInstruction: OUTLINE_PROMPT,
     contents: userMessage,
     schema: OUTLINE_SCHEMA,
@@ -234,7 +238,7 @@ ${segmentsToPrompt(segments)}`;
   if (!draft.tldr || !Array.isArray(draft.sections) || draft.sections.length === 0) {
     throw new Error('Outline 결과가 비정상입니다.');
   }
-  return draft;
+  return { outline: draft, usage };
 }
 
 function clampRange(
@@ -249,7 +253,7 @@ function clampRange(
 async function attachCitationsForSubsection(
   sub: OutlineSubsection,
   segments: TranscriptSegment[],
-): Promise<SummarySubsection> {
+): Promise<{ subsection: SummarySubsection; usage: Usage }> {
   const [lo, hi] = clampRange(sub.coveredIdxRange, segments.length);
   const slice = segments.slice(lo, hi + 1);
   const bulletsInput = sub.bullets.map((b) => ({
@@ -266,7 +270,7 @@ ${segmentsToPrompt(slice)}
 Bullets:
 ${JSON.stringify(bulletsInput, null, 2)}`;
 
-  const result = await callJson<CitationResult>({
+  const { result, usage } = await callJson<CitationResult>({
     systemInstruction: CITATION_PROMPT,
     contents: userMessage,
     schema: CITATION_SCHEMA,
@@ -293,36 +297,54 @@ ${JSON.stringify(bulletsInput, null, 2)}`;
   const startTs = segments[lo]?.ts ?? 0;
 
   return {
-    id: sub.id,
-    title: sub.title,
-    startTs,
-    bullets: sanitized,
+    subsection: {
+      id: sub.id,
+      title: sub.title,
+      startTs,
+      bullets: sanitized,
+    },
+    usage,
   };
+}
+
+export interface SummarizeResult {
+  doc: SummaryDoc;
+  usage: Usage;
 }
 
 export async function summarizeSermon(
   args: SummarizeArgs,
-): Promise<SummaryDoc> {
+): Promise<SummarizeResult> {
   if (args.segments.length === 0) {
     throw new Error('자막 세그먼트가 비어있습니다.');
   }
 
-  const outline = await extractOutline(args);
+  const totalUsage = emptyUsage();
+  const { outline, usage: outlineUsage } = await extractOutline(args);
+  addUsage(totalUsage, outlineUsage);
 
   const sections: SummarySection[] = await Promise.all(
     outline.sections.map(async (sec) => ({
       id: sec.id,
       title: sec.title,
       subsections: await Promise.all(
-        sec.subsections.map((sub) =>
-          attachCitationsForSubsection(sub, args.segments),
-        ),
+        sec.subsections.map(async (sub) => {
+          const { subsection, usage } = await attachCitationsForSubsection(
+            sub,
+            args.segments,
+          );
+          addUsage(totalUsage, usage);
+          return subsection;
+        }),
       ),
     })),
   );
 
   return {
-    tldr: outline.tldr,
-    sections,
+    doc: {
+      tldr: outline.tldr,
+      sections,
+    },
+    usage: totalUsage,
   };
 }

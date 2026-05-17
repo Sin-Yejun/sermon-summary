@@ -832,7 +832,7 @@ describe('summarizeSermon', () => {
     expect(md).toBe('## 도입\n…요약…');
     expect(generateContentMock).toHaveBeenCalledOnce();
     const args = generateContentMock.mock.calls[0][0];
-    expect(args.model).toBe('gemini-3.1-flash-lite-preview');
+    expect(args.model).toBe('gemini-3.1-flash-lite');
     expect(args.config.systemInstruction).toMatch(/한국어 설교 요약/);
     expect(typeof args.contents).toBe('string');
     expect(args.contents).toContain('테스트');
@@ -868,7 +868,7 @@ Create `lib/summarize.ts`:
 ```ts
 import { GoogleGenAI } from '@google/genai';
 
-const MODEL = 'gemini-3.1-flash-lite-preview';
+const MODEL = 'gemini-3.1-flash-lite';
 
 const SYSTEM_PROMPT = `당신은 한국어 설교 요약 전문 어시스턴트입니다.
 주어진 자막 텍스트로부터 설교의 핵심 메시지를 충실히 정리하되,
@@ -1602,7 +1602,7 @@ pnpm test
    - Description parsed for sermon-specific fields
    - `yt-dlp --write-auto-sub --sub-lang ko` for Korean auto-subtitles
    - VTT parsed to plain transcript
-   - Gemini `gemini-3.1-flash-lite-preview` produces structured markdown summary
+   - Gemini `gemini-3.1-flash-lite` produces structured markdown summary
 4. Client polls `/api/sermon/<videoId>` every 1.5s until `done`/`failed`
 ````
 

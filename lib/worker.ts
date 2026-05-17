@@ -1,10 +1,12 @@
 import { fetchSubtitleSegments, fetchVideoMetadata } from './youtube';
+import { transcribeFromUrl } from './transcribe';
 import { parseSermonMetadata } from './metadata';
 import { summarizeSermon } from './summarize';
 import { getSermon, updateSermon } from './db';
 import { weekOfFor } from './week';
 import { findMetadataRules } from './playlists';
 import { errorMessage } from './format';
+import { addUsage, emptyUsage, formatUsage } from './pricing';
 import type { TranscriptSegment } from './types';
 
 const MIN_TRANSCRIPT_LENGTH = 500;
@@ -52,8 +54,22 @@ export async function processSermon(
       weekOf,
     });
 
+    const totalUsage = emptyUsage();
+
     updateSermon(videoId, { status: 'transcribing' });
-    const segments = await fetchSubtitleSegments(url);
+    let segments: TranscriptSegment[];
+    let transcriptSource: 'caption' | 'audio_stt' = 'caption';
+    try {
+      segments = await fetchSubtitleSegments(url);
+    } catch (captionError) {
+      console.warn(
+        `[worker:${videoId}] caption fetch failed (${errorMessage(captionError)}), falling back to audio STT`,
+      );
+      const stt = await transcribeFromUrl(url);
+      segments = stt.segments;
+      addUsage(totalUsage, stt.usage);
+      transcriptSource = 'audio_stt';
+    }
     const transcript = segmentsToText(segments);
     if (transcript.length < MIN_TRANSCRIPT_LENGTH) {
       throw new Error('자막이 너무 짧거나 비정상입니다.');
@@ -64,7 +80,7 @@ export async function processSermon(
     });
 
     updateSermon(videoId, { status: 'summarizing' });
-    const summaryDoc = await summarizeSermon({
+    const summary = await summarizeSermon({
       segments,
       meta: {
         title: parsed.title ?? ytMeta.title,
@@ -73,12 +89,17 @@ export async function processSermon(
         sermonDate: parsed.sermonDate,
       },
     });
+    addUsage(totalUsage, summary.usage);
 
     updateSermon(videoId, {
-      summaryJson: JSON.stringify(summaryDoc),
-      summaryTldr: summaryDoc.tldr?.trim() || null,
+      summaryJson: JSON.stringify(summary.doc),
+      summaryTldr: summary.doc.tldr?.trim() || null,
       status: 'done',
     });
+
+    console.log(
+      `[worker:${videoId}] source=${transcriptSource} ${formatUsage(totalUsage)}`,
+    );
   } catch (e) {
     updateSermon(videoId, { status: 'failed', errorMessage: errorMessage(e) });
   }

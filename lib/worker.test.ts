@@ -4,14 +4,19 @@ vi.mock('./youtube', () => ({
   fetchVideoMetadata: vi.fn(),
   fetchSubtitleSegments: vi.fn(),
 }));
+vi.mock('./transcribe', () => ({
+  transcribeFromUrl: vi.fn(),
+}));
 vi.mock('./summarize', () => ({
   summarizeSermon: vi.fn(),
 }));
 
 import { fetchVideoMetadata, fetchSubtitleSegments } from './youtube';
+import { transcribeFromUrl } from './transcribe';
 import { summarizeSermon } from './summarize';
 import { processSermon } from './worker';
 import { createDb, createSermon, getSermon } from './db';
+import { emptyUsage } from './pricing';
 import type { SummaryDoc, TranscriptSegment } from './types';
 
 function makeSegments(n: number): TranscriptSegment[] {
@@ -46,6 +51,7 @@ describe('processSermon', () => {
     createDb({ reset: true });
     vi.mocked(fetchVideoMetadata).mockReset();
     vi.mocked(fetchSubtitleSegments).mockReset();
+    vi.mocked(transcribeFromUrl).mockReset();
     vi.mocked(summarizeSermon).mockReset();
   });
 
@@ -62,7 +68,10 @@ describe('processSermon', () => {
       upload_date: '20260426',
     });
     vi.mocked(fetchSubtitleSegments).mockResolvedValue(makeSegments(60));
-    vi.mocked(summarizeSermon).mockResolvedValue(structuredClone(SUMMARY));
+    vi.mocked(summarizeSermon).mockResolvedValue({
+      doc: structuredClone(SUMMARY),
+      usage: emptyUsage(),
+    });
 
     createSermon('abc12345678', 'https://youtu.be/abc12345678');
     await processSermon('abc12345678', 'https://youtu.be/abc12345678');
@@ -83,7 +92,7 @@ describe('processSermon', () => {
     expect(s!.errorMessage).toBeNull();
   });
 
-  it('marks failed when subtitles fetch throws', async () => {
+  it('falls back to audio STT when subtitles fetch throws', async () => {
     vi.mocked(fetchVideoMetadata).mockResolvedValue({
       id: 'abc12345678',
       title: 't',
@@ -93,13 +102,45 @@ describe('processSermon', () => {
       upload_date: '20260426',
     });
     vi.mocked(fetchSubtitleSegments).mockRejectedValue(new Error('자막 없음'));
+    vi.mocked(transcribeFromUrl).mockResolvedValue({
+      segments: makeSegments(60),
+      usage: emptyUsage(),
+    });
+    vi.mocked(summarizeSermon).mockResolvedValue({
+      doc: structuredClone(SUMMARY),
+      usage: emptyUsage(),
+    });
+
+    createSermon('abc12345678', 'https://youtu.be/abc12345678');
+    await processSermon('abc12345678', 'https://youtu.be/abc12345678');
+
+    expect(transcribeFromUrl).toHaveBeenCalledWith(
+      'https://youtu.be/abc12345678',
+    );
+    const s = getSermon('abc12345678');
+    expect(s!.status).toBe('done');
+    expect(s!.transcript).toMatch(/^자막 본문/);
+    expect(s!.errorMessage).toBeNull();
+  });
+
+  it('marks failed when both subtitles and audio STT throw', async () => {
+    vi.mocked(fetchVideoMetadata).mockResolvedValue({
+      id: 'abc12345678',
+      title: 't',
+      description: '',
+      duration: 100,
+      channel: 'c',
+      upload_date: '20260426',
+    });
+    vi.mocked(fetchSubtitleSegments).mockRejectedValue(new Error('자막 없음'));
+    vi.mocked(transcribeFromUrl).mockRejectedValue(new Error('오디오 추출 실패'));
 
     createSermon('abc12345678', 'https://youtu.be/abc12345678');
     await processSermon('abc12345678', 'https://youtu.be/abc12345678');
 
     const s = getSermon('abc12345678');
     expect(s!.status).toBe('failed');
-    expect(s!.errorMessage).toBe('자막 없음');
+    expect(s!.errorMessage).toBe('오디오 추출 실패');
   });
 
   it('marks failed when transcript too short', async () => {

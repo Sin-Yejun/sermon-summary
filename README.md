@@ -35,7 +35,7 @@ pnpm test
    - Description parsed for sermon-specific fields (date, 본문구절, 설교자, 교회)
    - `yt-dlp --write-auto-sub --sub-lang ko` for Korean auto-subtitles
    - VTT parsed to plain transcript
-   - Gemini `gemini-3.1-flash-lite-preview` produces structured markdown summary
+   - Gemini `gemini-3.1-flash-lite` produces structured markdown summary
 4. Client polls `/api/sermon/<videoId>` every 1.5s until `done`/`failed`
 
 ## Smoke test (manual)

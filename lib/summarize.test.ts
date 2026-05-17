@@ -76,7 +76,7 @@ describe('summarizeSermon', () => {
       .mockResolvedValueOnce({ text: JSON.stringify(CITATION_RESPONSES[0]) })
       .mockResolvedValueOnce({ text: JSON.stringify(CITATION_RESPONSES[1]) });
 
-    const doc = await summarizeSermon({
+    const { doc } = await summarizeSermon({
       segments: segs(),
       meta: {
         title: '테스트',
@@ -95,7 +95,7 @@ describe('summarizeSermon', () => {
 
     expect(generateContentMock).toHaveBeenCalledTimes(3);
     const outlineCall = generateContentMock.mock.calls[0][0];
-    expect(outlineCall.model).toBe('gemini-3.1-flash-lite-preview');
+    expect(outlineCall.model).toBe('gemini-3.1-flash-lite');
     expect(outlineCall.config.systemInstruction).toMatch(/구조와 핵심 추출/);
     expect(outlineCall.contents).toContain('[0] 00:05 안녕하세요.');
 
@@ -112,7 +112,7 @@ describe('summarizeSermon', () => {
       .mockResolvedValueOnce({ text: JSON.stringify(bad) })
       .mockResolvedValueOnce({ text: JSON.stringify(CITATION_RESPONSES[1]) });
 
-    const doc = await summarizeSermon({
+    const { doc } = await summarizeSermon({
       segments: segs(),
       meta: { title: null, preacher: null, sermonDate: null, bibleReference: null },
     });
