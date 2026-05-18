@@ -10,10 +10,14 @@ vi.mock('./transcribe', () => ({
 vi.mock('./summarize', () => ({
   summarizeSermon: vi.fn(),
 }));
+vi.mock('./visualize', () => ({
+  generateVisualization: vi.fn(),
+}));
 
 import { fetchVideoMetadata, fetchSubtitleSegments } from './youtube';
 import { transcribeFromUrl } from './transcribe';
 import { summarizeSermon } from './summarize';
+import { generateVisualization } from './visualize';
 import { processSermon } from './worker';
 import { createDb, createSermon, getSermon } from './db';
 import { emptyUsage } from './pricing';
@@ -39,6 +43,14 @@ const SUMMARY: SummaryDoc = {
           title: '인생의 유한함',
           startTs: 5,
           bullets: [{ text: '인생은 짧다.', citations: [0] }],
+          suggestedVisual: 'none',
+        },
+        {
+          id: '1.2',
+          title: '청지기 3요소',
+          startTs: 10,
+          bullets: [{ text: '시간, 재물, 재능.', citations: [1] }],
+          suggestedVisual: 'mindmap',
         },
       ],
     },
@@ -53,6 +65,11 @@ describe('processSermon', () => {
     vi.mocked(fetchSubtitleSegments).mockReset();
     vi.mocked(transcribeFromUrl).mockReset();
     vi.mocked(summarizeSermon).mockReset();
+    vi.mocked(generateVisualization).mockReset();
+    vi.mocked(generateVisualization).mockResolvedValue({
+      visualization: null,
+      usage: emptyUsage(),
+    });
   });
 
   it('runs pipeline and stores result', async () => {
@@ -90,6 +107,47 @@ describe('processSermon', () => {
     const doc = JSON.parse(s!.summaryJson!) as SummaryDoc;
     expect(doc.sections[0].subsections[0].startTs).toBe(5);
     expect(s!.errorMessage).toBeNull();
+  });
+
+  it('attaches visualization only to subsections with suggestedVisual !== none', async () => {
+    vi.mocked(fetchVideoMetadata).mockResolvedValue({
+      id: 'abc12345678',
+      title: 't',
+      description: '',
+      duration: 100,
+      channel: 'c',
+      upload_date: '20260426',
+    });
+    vi.mocked(fetchSubtitleSegments).mockResolvedValue(makeSegments(60));
+    vi.mocked(summarizeSermon).mockResolvedValue({
+      doc: structuredClone(SUMMARY),
+      usage: emptyUsage(),
+    });
+    vi.mocked(generateVisualization).mockResolvedValue({
+      visualization: {
+        kind: 'mermaid',
+        diagram: 'mindmap',
+        source: 'mindmap\n  root((청지기))\n    시간\n    재물',
+      },
+      usage: emptyUsage(),
+    });
+
+    createSermon('abc12345678', 'https://youtu.be/abc12345678');
+    await processSermon('abc12345678', 'https://youtu.be/abc12345678');
+
+    expect(generateVisualization).toHaveBeenCalledTimes(1);
+    expect(generateVisualization).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'mindmap', subsectionTitle: '청지기 3요소' }),
+    );
+
+    const s = getSermon('abc12345678');
+    const doc = JSON.parse(s!.summaryJson!) as SummaryDoc;
+    expect(doc.sections[0].subsections[0].visualization).toBeNull();
+    expect(doc.sections[0].subsections[1].visualization).toEqual({
+      kind: 'mermaid',
+      diagram: 'mindmap',
+      source: 'mindmap\n  root((청지기))\n    시간\n    재물',
+    });
   });
 
   it('falls back to audio STT when subtitles fetch throws', async () => {

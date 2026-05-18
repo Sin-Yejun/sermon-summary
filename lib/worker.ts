@@ -2,6 +2,7 @@ import { fetchSubtitleSegments, fetchVideoMetadata } from './youtube';
 import { transcribeFromUrl } from './transcribe';
 import { parseSermonMetadata } from './metadata';
 import { summarizeSermon } from './summarize';
+import { generateVisualization } from './visualize';
 import { getSermon, updateSermon } from './db';
 import { weekOfFor } from './week';
 import { findMetadataRules } from './playlists';
@@ -91,9 +92,29 @@ export async function processSermon(
     });
     addUsage(totalUsage, summary.usage);
 
+    const doc = summary.doc;
+    await Promise.all(
+      doc.sections.flatMap((sec) =>
+        sec.subsections.map(async (sub) => {
+          const kind = sub.suggestedVisual;
+          if (!kind || kind === 'none') {
+            sub.visualization = null;
+            return;
+          }
+          const { visualization, usage } = await generateVisualization({
+            subsectionTitle: sub.title,
+            bullets: sub.bullets,
+            kind,
+          });
+          sub.visualization = visualization;
+          addUsage(totalUsage, usage);
+        }),
+      ),
+    );
+
     updateSermon(videoId, {
-      summaryJson: JSON.stringify(summary.doc),
-      summaryTldr: summary.doc.tldr?.trim() || null,
+      summaryJson: JSON.stringify(doc),
+      summaryTldr: doc.tldr?.trim() || null,
       status: 'done',
     });
 

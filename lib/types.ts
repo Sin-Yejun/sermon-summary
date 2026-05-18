@@ -23,11 +23,52 @@ export interface SummaryBullet {
   subBullets?: SummarySubBullet[];
 }
 
+export type VisualKind =
+  | 'none'
+  | 'flowchart'
+  | 'mindmap'
+  | 'compare'
+  | 'timeline'
+  | 'concept';
+
+export interface MermaidVisualization {
+  kind: 'mermaid';
+  diagram: 'flowchart' | 'mindmap';
+  source: string;
+}
+
+export interface CompareVisualization {
+  kind: 'compare';
+  axis: string;
+  left: { label: string; points: string[] };
+  right: { label: string; points: string[] };
+}
+
+export interface TimelineVisualization {
+  kind: 'timeline';
+  items: { marker: string; title: string; description: string }[];
+}
+
+export interface ConceptVisualization {
+  kind: 'concept';
+  term: string;
+  definition: string;
+  facets?: { label: string; value: string }[];
+}
+
+export type Visualization =
+  | MermaidVisualization
+  | CompareVisualization
+  | TimelineVisualization
+  | ConceptVisualization;
+
 export interface SummarySubsection {
   id: string;
   title: string;
   startTs: number;
   bullets: SummaryBullet[];
+  suggestedVisual?: VisualKind;
+  visualization?: Visualization | null;
 }
 
 export interface SummarySection {

@@ -41,6 +41,7 @@ const OUTLINE_RESPONSE = {
           title: '인생의 유한함',
           coveredIdxRange: [0, 2],
           bullets: [{ text: '인생은 영원하지 않다.' }],
+          suggestedVisual: 'none',
         },
       ],
     },
@@ -53,6 +54,7 @@ const OUTLINE_RESPONSE = {
           title: '맡기신 것을 관리',
           coveredIdxRange: [3, 3],
           bullets: [{ text: '청지기 정신이 필요하다.' }],
+          suggestedVisual: 'mindmap',
         },
       ],
     },
@@ -90,8 +92,10 @@ describe('summarizeSermon', () => {
     expect(doc.sections).toHaveLength(2);
     expect(doc.sections[0].subsections[0].startTs).toBe(5);
     expect(doc.sections[0].subsections[0].bullets[0].citations).toEqual([2]);
+    expect(doc.sections[0].subsections[0].suggestedVisual).toBe('none');
     expect(doc.sections[1].subsections[0].startTs).toBe(28);
     expect(doc.sections[1].subsections[0].bullets[0].citations).toEqual([3]);
+    expect(doc.sections[1].subsections[0].suggestedVisual).toBe('mindmap');
 
     expect(generateContentMock).toHaveBeenCalledTimes(3);
     const outlineCall = generateContentMock.mock.calls[0][0];

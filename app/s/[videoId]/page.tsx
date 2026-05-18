@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { use, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { errorMessage, fmtTs } from '@/lib/format';
 import type {
@@ -10,6 +11,13 @@ import type {
   SummarySubsection,
   TranscriptSegment,
 } from '@/lib/types';
+
+const MermaidBlock = dynamic(
+  () => import('./mermaid-block').then((m) => m.MermaidBlock),
+  { ssr: false, loading: () => null },
+);
+
+import { CompareCard, TimelineCard, ConceptCard } from './visual-blocks';
 
 declare global {
   interface Window {
@@ -455,6 +463,7 @@ function Subsection({
   sub: SummarySubsection;
   onSeek: (ts: number) => void;
 }) {
+  const viz = sub.visualization;
   return (
     <div id={`sub-${sub.id}`} className="scroll-mt-4">
       <h3 className="mb-2 flex items-baseline gap-2 text-lg font-semibold">
@@ -470,6 +479,10 @@ function Subsection({
           {fmtTs(sub.startTs)}
         </button>
       </h3>
+      {viz?.kind === 'mermaid' && <MermaidBlock source={viz.source} />}
+      {viz?.kind === 'compare' && <CompareCard data={viz} />}
+      {viz?.kind === 'timeline' && <TimelineCard data={viz} />}
+      {viz?.kind === 'concept' && <ConceptCard data={viz} />}
       <ul className="space-y-2 text-sm leading-relaxed">
         {sub.bullets.map((b, i) => (
           <BulletItem key={i} bullet={b} />

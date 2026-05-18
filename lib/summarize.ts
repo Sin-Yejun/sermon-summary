@@ -7,6 +7,7 @@ import type {
   SummarySection,
   SummarySubsection,
   TranscriptSegment,
+  VisualKind,
 } from './types';
 
 const MODEL = 'gemini-3.1-flash-lite';
@@ -39,15 +40,44 @@ const OUTLINE_PROMPT = `${SHARED_PRINCIPLES}
 입력으로 주어지는 자막 세그먼트(각 줄: [idx] mm:ss 텍스트)에서
 설교의 흐름을 sections > subsections 계층으로 정리한다.
 
+[목표 분량]
+지나친 압축보다 충실한 재현을 우선한다. 설교에서 실제로 다뤄진 내용은
+가능한 한 빠짐없이 담는다. 단, 자막 그대로의 길이로 늘어뜨리지 말고
+의미 단위로 정돈된 문장으로 옮긴다.
+
 규칙:
 - 출력은 JSON 스키마를 정확히 따른다.
-- tldr: 2~3문장으로 설교 전체를 압축.
+- tldr: 3~5문장으로 설교 전체의 핵심 메시지·본문구절·결단 포인트를 압축.
 - sections: 3~6개. id는 "1", "2", "3" 형식.
-- subsections: 각 section마다 1~3개. id는 "1.1", "1.2"처럼 부모와 점 표기.
+- subsections: 각 section마다 2~4개. id는 "1.1", "1.2"처럼 부모와 점 표기.
+  한 section이 1개 subsection으로만 끝나지 않도록 한다(섹션이 충분히 짧을 때만 예외).
 - 각 subsection은 coveredIdxRange로 그 단락이 자막의 어느 idx 범위를 커버하는지
   [startIdx, endIdx]를 명시한다(닫힌 구간, 둘 다 포함).
-- 각 subsection.bullets: 3~6개. 핵심 명제. 필요하면 subBullets 한 단계만 더.
-- bullets와 subBullets에는 citations를 포함하지 않는다(다음 단계에서 부여).`;
+- 각 subsection.bullets: 4~7개.
+  - 각 bullet은 한 문장(30~90자). "주장 + 근거/예시/맥락"이 함께 담기도록.
+  - 추상적 권면("X해야 한다")보다 구체적 근거·예화·인용을 곁들여 풀어 쓴다.
+  - 단순 동어 반복 금지. bullet 간 내용이 겹치면 통합한다.
+- subBullets: 적극 활용. bullet 1개당 0~3개.
+  - 부연·예시·성경구절 인용·설교자 표현 그대로 인용 등에 사용한다.
+  - 단순 반복 금지. bullet의 의미를 확장하거나 구체화할 때만.
+- bullets와 subBullets에는 citations를 포함하지 않는다(다음 단계에서 부여).
+
+[suggestedVisual 선정 규칙]
+각 subsection마다 도식화가 유익할지 판단하여 다음 중 하나를 고른다.
+- 'flowchart': **인과/순서/조건 흐름**이 명확할 때 (예: "회개 → 용서 → 감사", "원인 → 결과")
+- 'mindmap': **한 개념의 분류/하위요소**가 2~4개로 명확히 나뉠 때 (예: "청지기 정신의 3요소", "사랑의 3가지 표현")
+- 'compare': **두 입장/상태/결과의 대조**가 핵심일 때 (예: "효도하는 자녀 vs 불효하는 자녀", "옛 사람 vs 새 사람", "율법주의 vs 복음")
+- 'timeline': **시간 순서/단계적 변화**가 핵심일 때 (예: 성경 사건의 흐름, 신앙 성장의 단계, 다윗 생애의 시기)
+- 'concept': **하나의 핵심 단어/개념**에 대한 정의와 측면이 핵심일 때 (예: "임마누엘 — 하나님이 우리와 함께", "케노시스 — 자기 비움")
+- 'none': 도식이 의미를 더하지 않을 때 (단순 권면, 예화 자체, 도입, 축복, 정서적 호소 등). **기본값은 'none'이며 도식이 정말 도움될 때만 다른 값을 고른다.** 의미 없는 도식이 의미 있는 도식보다 더 해롭다.
+
+판단 우선순위(의심스러우면 위쪽이 우선):
+1. 두 항목이 명확히 대비되는가 → 'compare'
+2. 시간/단계 순서가 핵심인가 → 'timeline'
+3. 인과/논리 흐름이 핵심인가 → 'flowchart'
+4. 하나의 개념에 하위 요소가 있는가 → 'mindmap'
+5. 한 개념의 정의·강조만이 핵심인가 → 'concept'
+6. 위 어느 것도 아니면 → 'none'`;
 
 const CITATION_PROMPT = `${SHARED_PRINCIPLES}
 
@@ -102,8 +132,25 @@ const OUTLINE_SCHEMA = {
                   items: { type: Type.INTEGER },
                 },
                 bullets: { type: Type.ARRAY, items: BULLET_INPUT_SCHEMA },
+                suggestedVisual: {
+                  type: Type.STRING,
+                  enum: [
+                    'none',
+                    'flowchart',
+                    'mindmap',
+                    'compare',
+                    'timeline',
+                    'concept',
+                  ],
+                },
               },
-              required: ['id', 'title', 'coveredIdxRange', 'bullets'],
+              required: [
+                'id',
+                'title',
+                'coveredIdxRange',
+                'bullets',
+                'suggestedVisual',
+              ],
             },
           },
         },
@@ -147,6 +194,20 @@ interface OutlineSubsection {
   title: string;
   coveredIdxRange: [number, number] | number[];
   bullets: { text: string; subBullets?: { text: string }[] }[];
+  suggestedVisual?: VisualKind;
+}
+
+const VALID_VISUALS: readonly VisualKind[] = [
+  'none',
+  'flowchart',
+  'mindmap',
+  'compare',
+  'timeline',
+  'concept',
+];
+
+function normalizeVisual(v: unknown): VisualKind {
+  return VALID_VISUALS.includes(v as VisualKind) ? (v as VisualKind) : 'none';
 }
 interface OutlineSection {
   id: string;
@@ -302,6 +363,7 @@ ${JSON.stringify(bulletsInput, null, 2)}`;
       title: sub.title,
       startTs,
       bullets: sanitized,
+      suggestedVisual: normalizeVisual(sub.suggestedVisual),
     },
     usage,
   };
